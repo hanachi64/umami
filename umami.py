@@ -91,7 +91,7 @@ if race_file and rate_file:
                 key=f"{name}_{field}"
             )
         )
-    df["補正スコア"] = df[[f + "補正" for f in correction_fields]].sum(axis=1)
+    df["補正スコア"] = df[[f + "補正" for f in correction_fields]].sum(axis=1).astype(float)
 
     # 総合スコアと確率
     df["総合スコア"] = df["人気スコア"] * 0.5 + df["複勝率スコア"] * 0.3 + df["補正スコア"] * 0.2
