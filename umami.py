@@ -154,29 +154,34 @@ if race_file and rate_file:
         cols[3].markdown(f"🟡 単勝期待値: {t_exp:.2f}")
         cols[4].markdown(f"🟢 複勝期待値: {f_exp:.2f}")
 
-    # 馬連・ワイド用の手入力UI
-    if "馬連" in ticket_types or "ワイド" in ticket_types:
-        st.subheader("⑦ 馬連・ワイド 手入力 + 期待値")
-        horses = df["馬名"].tolist()
-        pairs = list(itertools.combinations(horses, 2))
+# 馬連・ワイド用の手入力UI
+if "馬連" in ticket_types or "ワイド" in ticket_types:
+    st.subheader("⑦ 馬連・ワイド 手入力 + 期待値")
+    horses = df["馬名"].tolist()
+    pairs = list(itertools.combinations(horses, 2))
 
-        for i, (h1, h2) in enumerate(pairs):
-            cols = st.columns([2, 1, 1, 1, 1])
-            cols[0].markdown(f"**{h1} × {h2}**")
+    for i, (h1, h2) in enumerate(pairs):
+        cols = st.columns([2, 1, 1, 1, 1])
+        cols[0].markdown(f"**{h1} × {h2}**")
 
-            umaren_odds = cols[1].number_input(f"馬連_{h1}_{h2}", min_value=0.0, step=0.1, key=f"umaren_{i}")
-            wide_odds = cols[2].number_input(f"ワイド_{h1}_{h2}", min_value=0.0, step=0.1, key=f"wide_{i}")
+        umaren_odds = cols[1].number_input(f"馬連_{h1}_{h2}", min_value=0.0, step=0.1, key=f"umaren_{i}")
+        wide_odds = cols[2].number_input(f"ワイド_{h1}_{h2}", min_value=0.0, step=0.1, key=f"wide_{i}")
 
-            prob1 = df[df["馬名"] == h1]["確率"].values[0]
-            prob2 = df[df["馬名"] == h2]["確率"].values[0]
+        # 安全に確率取得（該当がなければ0.0に）
+        prob1 = df[df["馬名"] == h1]["確率"]
+        prob1 = prob1.values[0] if not prob1.empty else 0.0
 
-            pair_prob = prob1 * prob2 * 2  # 簡易合成確率（独立仮定 ×2補正）
+        prob2 = df[df["馬名"] == h2]["確率"]
+        prob2 = prob2.values[0] if not prob2.empty else 0.0
 
-            uma_exp = umaren_odds * pair_prob if umaren_odds > 0 else 0
-            wide_exp = wide_odds * pair_prob if wide_odds > 0 else 0
+        pair_prob = prob1 * prob2 * 2  # 簡易合成確率（独立仮定 ×2補正）
 
-            cols[3].markdown(f"🟣 馬連期待値: {uma_exp:.2f}")
-            cols[4].markdown(f"🔵 ワイド期待値: {wide_exp:.2f}")
+        uma_exp = umaren_odds * pair_prob if umaren_odds > 0 else 0
+        wide_exp = wide_odds * pair_prob if wide_odds > 0 else 0
+
+        cols[3].markdown(f"🟣 馬連期待値: {uma_exp:.2f}")
+        cols[4].markdown(f"🔵 ワイド期待値: {wide_exp:.2f}")
+
 
 else:
     st.info("出走表と複勝率CSVを両方アップロードしてください。")
