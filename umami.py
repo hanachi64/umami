@@ -56,44 +56,51 @@ if race_file and rate_file:
         st.error(f"CSVの読み込みに失敗しました：{e}")
         st.stop()
 
-    # オッズカラム判定
     odds_candidates = ["オッズ", "単勝", "単勝オッズ"]
     odds_col = next((col for col in odds_candidates if col in race_df.columns), None)
     if odds_col is None:
         st.error("⚠️ 出走表に『オッズ』または『単勝』というカラムが見つかりません。")
         st.stop()
 
-    # 単勝オッズを統一カラムにコピー
     race_df["単勝オッズ"] = race_df[odds_col]
-
-    # マッピング準備
     df = race_df.copy()
     rate_map = rate_df.set_index("馬名")["複勝率"].to_dict()
 
-    # スコア計算
     df["人気スコア"] = 1 / df["単勝オッズ"]
     df["複勝率スコア"] = df["馬名"].map(rate_map).fillna(0.0)
 
-    # 補正入力（±0.05刻み）
-    st.subheader("③ 各馬の補正項目（±0.05刻み）")
+    st.subheader("③ 各馬の補正項目（横並び・±0.05刻み）")
     correction_fields = {
         "距離適性": 0.10,
         "脚質適性": 0.10,
         "馬場適性": 0.05,
         "枠順適性": 0.05
     }
-    for field, max_val in correction_fields.items():
-        df[field + "補正"] = df["馬名"].apply(
-            lambda name: st.selectbox(
-                f"{name} の {field}",
+
+    corrections = {f + "補正": [] for f in correction_fields}
+
+    st.markdown("### 補正入力表")
+    header = st.columns([1] + [1 for _ in correction_fields])
+    header[0].markdown("**馬名**")
+    for i, f in enumerate(correction_fields):
+        header[i + 1].markdown(f"**{f}**")
+
+    for idx, row in df.iterrows():
+        cols = st.columns([1] + [1 for _ in correction_fields])
+        cols[0].markdown(row["馬名"])
+        for i, (field, max_val) in enumerate(correction_fields.items()):
+            val = cols[i + 1].selectbox(
+                "",
                 options=[round(x, 2) for x in [-max_val, -max_val/2, 0.0, max_val/2, max_val]],
                 index=2,
-                key=f"{name}_{field}"
+                key=f"{row['馬名']}_{field}"
             )
-        )
-    df["補正スコア"] = df[[f + "補正" for f in correction_fields]].sum(axis=1).astype(float)
+            corrections[field + "補正"].append(val)
 
-    # 総合スコアと確率
+    for key, values in corrections.items():
+        df[key] = values
+
+    df["補正スコア"] = df[[f + "補正" for f in correction_fields]].sum(axis=1).astype(float)
     df["総合スコア"] = df["人気スコア"] * 0.5 + df["複勝率スコア"] * 0.3 + df["補正スコア"] * 0.2
     df["確率"] = normalize(df["総合スコア"])
 
@@ -103,7 +110,6 @@ if race_file and rate_file:
     if "複勝" in ticket_types and "複勝オッズ" in df.columns:
         df["複勝期待値"] = df["複勝オッズ"] * df["確率"]
 
-    # 結果表示
     st.subheader("④ 期待値表示（黄色 = 閾値以上）")
     for t in ticket_types:
         col = f"{t}期待値"
@@ -115,7 +121,6 @@ if race_file and rate_file:
             st.markdown(f"### {t} 期待値")
             st.dataframe(styled_df)
 
-    # 払戻シミュレーター
     st.subheader("⑤ 払戻しシミュレーター")
     bet = st.number_input("1点あたりの購入額（円）", min_value=100, step=100, value=100)
     for t in ticket_types:
@@ -126,4 +131,3 @@ if race_file and rate_file:
             st.dataframe(df[["馬名", col, f"{t}払戻期待値"]])
 else:
     st.info("出走表と複勝率CSVを両方アップロードしてください。")
-
