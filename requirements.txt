@@ -1,3 +1,3 @@
 python
 pandas
-chardet
+chardet #
