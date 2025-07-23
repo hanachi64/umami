@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import itertools
 from chardet.universaldetector import UniversalDetector
 
 # --- エンコーディング自動検出 ---
@@ -33,7 +34,7 @@ st.title("競馬馬券 期待値比較アプリ")
 st.sidebar.header("設定")
 
 # 馬券種の選択
-ticket_types = st.sidebar.multiselect("馬券種を選択してください", ["単勝", "複勝"], default=["単勝"])
+ticket_types = st.sidebar.multiselect("馬券種を選択してください", ["単勝", "複勝", "馬連", "ワイド"], default=["単勝"])
 
 # 期待値の閾値
 threshold = st.sidebar.number_input("期待値の閾値（例：1.2）", min_value=0.0, value=1.0, step=0.05)
@@ -133,5 +134,49 @@ if race_file and rate_file:
             df[f"{t}払戻期待値"] = df[col] * bet
             st.markdown(f"### {t} 予想払戻額（1点 {bet}円）")
             st.dataframe(df[["馬名", col, f"{t}払戻期待値"]])
+
+    # オッズ手入力フォーム（任意）
+    st.subheader("⑥ 手入力オッズ（単勝・複勝 + 期待値表示）")
+    st.markdown("⚠️ 出走表CSVにオッズが無い場合はここで手入力してください")
+    for idx, row in df.iterrows():
+        cols = st.columns([2, 1, 1, 1, 1])
+        cols[0].markdown(f"**{row['馬名']}**")
+
+        tan_input = cols[1].number_input(f"単勝_{row['馬名']}", value=float(row.get("単勝オッズ", 0.0)), step=0.1, key=f"tan_input_{idx}")
+        fuku_input = cols[2].number_input(f"複勝_{row['馬名']}", value=float(row.get("複勝オッズ", 0.0)), step=0.1, key=f"fuku_input_{idx}")
+
+        df.at[idx, "単勝オッズ"] = tan_input
+        df.at[idx, "複勝オッズ"] = fuku_input
+
+        t_exp = tan_input * row["確率"] if tan_input > 0 else 0
+        f_exp = fuku_input * row["確率"] if fuku_input > 0 else 0
+
+        cols[3].markdown(f"🟡 単勝期待値: {t_exp:.2f}")
+        cols[4].markdown(f"🟢 複勝期待値: {f_exp:.2f}")
+
+    # 馬連・ワイド用の手入力UI
+    if "馬連" in ticket_types or "ワイド" in ticket_types:
+        st.subheader("⑦ 馬連・ワイド 手入力 + 期待値")
+        horses = df["馬名"].tolist()
+        pairs = list(itertools.combinations(horses, 2))
+
+        for i, (h1, h2) in enumerate(pairs):
+            cols = st.columns([2, 1, 1, 1, 1])
+            cols[0].markdown(f"**{h1} × {h2}**")
+
+            umaren_odds = cols[1].number_input(f"馬連_{h1}_{h2}", min_value=0.0, step=0.1, key=f"umaren_{i}")
+            wide_odds = cols[2].number_input(f"ワイド_{h1}_{h2}", min_value=0.0, step=0.1, key=f"wide_{i}")
+
+            prob1 = df[df["馬名"] == h1]["確率"].values[0]
+            prob2 = df[df["馬名"] == h2]["確率"].values[0]
+
+            pair_prob = prob1 * prob2 * 2  # 簡易合成確率（独立仮定 ×2補正）
+
+            uma_exp = umaren_odds * pair_prob if umaren_odds > 0 else 0
+            wide_exp = wide_odds * pair_prob if wide_odds > 0 else 0
+
+            cols[3].markdown(f"🟣 馬連期待値: {uma_exp:.2f}")
+            cols[4].markdown(f"🔵 ワイド期待値: {wide_exp:.2f}")
+
 else:
     st.info("出走表と複勝率CSVを両方アップロードしてください。")
