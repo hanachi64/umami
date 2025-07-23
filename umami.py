@@ -68,7 +68,8 @@ if race_file and rate_file:
     rate_map = rate_df.set_index("馬名")["複勝率"].to_dict()
 
     df["人気スコア"] = 1 / df["単勝オッズ"]
-    df["複勝率スコア"] = df["馬名"].map(rate_map).fillna(0.0)
+    df["複勝率スコア"] = df["馬名"].map(rate_map)
+    df["複勝率スコア"] = pd.to_numeric(df["複勝率スコア"], errors="coerce").fillna(0.0)
 
     # 補正項目表形式UI
     st.subheader("③ 各馬の補正項目（横並び・±0.05刻み）")
